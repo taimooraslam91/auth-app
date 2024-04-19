@@ -11,16 +11,12 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from 'lucide-react';
+import { ArrowUpDown, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -33,17 +29,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  useDeleteUserMutation,
-  useGetUsersQuery,
-} from '@/slices/usersApiSlice';
+  useGetProductsQuery,
+  useSyncShopifyMutation,
+} from '@/slices/productsApiSlice';
+import { useSelector } from 'react-redux';
+import LoadingSpinner from '@/components/ui/LoadinSpinner';
 
-export type Payment = {
+export type Products = {
   id: string;
   name: string;
-  email: string;
+  description: string;
+  brand: string;
+  image: string;
+  status: string;
 };
 
-export const columns: ColumnDef<Payment>[] = [
+export const columns: ColumnDef<Products>[] = [
   {
     accessorKey: 'name',
     header: ({ column }) => {
@@ -57,58 +58,66 @@ export const columns: ColumnDef<Payment>[] = [
         </div>
       );
     },
-    cell: ({ row }) => <div className='capitalize'>{row.getValue('name')}</div>,
+    cell: ({ row }) => (
+      <div className='flex items-center gap-3'>
+        <img
+          src={row.original.image}
+          alt='Row Image'
+          style={{ width: 50, height: 50, borderRadius: '10px' }}
+        />
+        <div className='capitalize'>{row.getValue('name')}</div>
+      </div>
+    ),
   },
   {
-    accessorKey: 'email',
-    header: ({ column }) => {
-      return (
-        <div
-          className='flex items-center gap-1 cursor-pointer'
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          Email
-          <ArrowUpDown className='ml-2 h-4 w-4' />
-        </div>
-      );
+    accessorKey: 'description',
+    header: () => {
+      return <div>Description</div>;
     },
-    cell: ({ row }) => <div className='lowercase'>{row.getValue('email')}</div>,
+    cell: ({ row }) => (
+      <div className='lowercase'>{row.getValue('description')}</div>
+    ),
   },
   {
-    id: 'actions',
-    enableHiding: false,
-    cell: ({ row }) => {
-      return (
-        <div className='text-right'>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant='ghost' className='h-8 w-8 p-0'>
-                <span className='sr-only'>Open menu</span>
-                <MoreHorizontal className='h-4 w-4' />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end'>
-              <DropdownMenuItem>Delete</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      );
+    accessorKey: 'brand',
+    header: () => {
+      return <div>Brand</div>;
     },
+    cell: ({ row }) => <div className='lowercase'>{row.getValue('brand')}</div>,
+  },
+  {
+    accessorKey: 'category',
+    header: () => {
+      return <div>Category</div>;
+    },
+    cell: ({ row }) => (
+      <div className='lowercase'>{row.getValue('category')}</div>
+    ),
+  },
+  {
+    accessorKey: 'status',
+    header: () => {
+      return <div>Status</div>;
+    },
+    cell: ({ row }) => (
+      <div className='lowercase'>{row.getValue('status')}</div>
+    ),
   },
 ];
 
-function UserTable() {
+function ProductTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
+  const { userInfo } = useSelector((state: any) => state.auth);
+  const isAdmin = userInfo?.isAdmin;
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
-  const { data, isLoading } = useGetUsersQuery({});
-
-  const [deleteUser] = useDeleteUserMutation();
-
+  const { data, isLoading, refetch } = useGetProductsQuery({});
+  const [syncShopify, { isLoading: isLoadingSync, isSuccess }] =
+    useSyncShopifyMutation();
   const table = useReactTable({
     data: data || [],
     columns,
@@ -128,11 +137,33 @@ function UserTable() {
     },
   });
 
+  React.useEffect(() => {
+    if (isSuccess) {
+      refetch();
+    }
+  }, [isSuccess]);
+
+  const handleSyncClick = async () => {
+    try {
+      const result = await syncShopify({}).unwrap();
+    } catch (err) {
+      console.error('Failed to sync:', err);
+    }
+  };
+
   return (
     <>
-      <h3 className='tracking-normal font-sans text-2xl font-semibold leading-snug text-blue-gray-900 mb-10'>
-        Users
-      </h3>
+      <div className='flex items-center justify-between'>
+        <h3 className='tracking-normal font-sans text-2xl font-semibold leading-snug text-blue-gray-900 mb-10'>
+          Products
+        </h3>
+        {isAdmin && (
+          <Button onClick={handleSyncClick} disabled={isLoadingSync}>
+            {isLoadingSync && <LoadingSpinner className='mr-2' />}
+            Sync Product
+          </Button>
+        )}
+      </div>
       <div className='w-full'>
         <div className='flex items-center py-4'>
           <Input
@@ -253,4 +284,4 @@ function UserTable() {
     </>
   );
 }
-export default UserTable;
+export default ProductTable;
